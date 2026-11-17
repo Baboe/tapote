@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tapote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=Onest:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one long scroll where the whole page changes colour per chapter,
+   objects turn and swing with the scroll, and every tap on the page sends out rings. */
+:root{
+  --navy:#0B1033;
+  --blue:#2B2BD9;
+  --teal:#1FE5C5;
+  --tangerine:#FF7A3D;
+  --lemon:#FFD84A;
+  --cream:#F6F1E7;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"Onest","Helvetica Neue",Arial,sans-serif;
+  --bg:var(--navy);
+  --ink:var(--cream);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:1.0625rem;line-height:1.55;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);line-height:1.02;text-wrap:balance;letter-spacing:-.02em}
+p{max-width:34em}
+.wrap{width:min(1120px,100%);margin-inline:auto;padding-inline:clamp(18px,5vw,48px)}
+[data-bg]{background:var(--sbg);color:var(--sink);position:relative}
+.morph [data-bg]{background:transparent;color:inherit}
+#rings{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+#bar{position:fixed;top:0;left:0;height:4px;width:100%;background:currentColor;transform-origin:0 50%;transform:scaleX(var(--scroll,0));z-index:6}
+
+/* ---------- hero ---------- */
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-block:20px;font-size:.8rem;letter-spacing:.12em;text-transform:uppercase}
+.badge{display:inline-flex;align-items:center;gap:8px;border:1.5px solid currentColor;border-radius:99px;padding:6px 12px;white-space:nowrap}
+.badge i{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+.hero{padding-bottom:clamp(28px,6vw,64px)}
+.word{font-family:var(--display);font-weight:800;font-size:clamp(3.3rem,18.5vw,14.5rem);line-height:.86;letter-spacing:-.05em;display:flex;margin:clamp(20px,6vw,60px) 0 clamp(18px,3vw,32px);user-select:none}
+.word span{display:inline-block;transform-origin:50% 100%}
+.word span:nth-child(4){color:var(--teal)}
+.word.hop span{animation:hop .55s cubic-bezier(.3,1.6,.5,1) calc(var(--i)*55ms)}
+@keyframes hop{35%{transform:translateY(-16%) scaleY(1.08) rotate(calc((var(--i) - 2.5)*2deg))}70%{transform:translateY(2%) scaleY(.94)}}
+.hero h1{font-size:clamp(1.5rem,4.6vw,3rem);font-weight:600;max-width:15em}
+.hero .lead{margin-top:18px;font-size:clamp(1.05rem,2vw,1.25rem)}
+.taphint{margin-top:28px;display:inline-flex;align-items:center;gap:14px;font-family:var(--display);font-size:.85rem}
+#dot{width:44px;height:44px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;flex:none}
+#dot::after{content:"";width:14px;height:14px;border-radius:50%;background:var(--tangerine);animation:press 1.4s infinite}
+@keyframes press{0%,100%{transform:scale(1)}12%{transform:scale(.55)}}
+
+/* ---------- marquee ---------- */
+.marquee{overflow:hidden;padding-block:clamp(16px,3vw,28px);border-block:1.5px solid currentColor;font-family:var(--display);font-weight:800;font-size:clamp(2rem,8vw,5.5rem);line-height:1;white-space:nowrap}
+.track{display:inline-flex;will-change:transform}
+.track + .track{margin-top:.12em}
+.track b{padding-right:.45em;font-weight:800}
+.track b:nth-child(odd){color:transparent;-webkit-text-stroke:1.5px var(--ink)}
+[data-bg] .track b:nth-child(odd){-webkit-text-stroke-color:currentColor}
+
+/* ---------- pinned tap scene ---------- */
+.scene{height:280vh;--a:1;--b:1}
+.pin{position:sticky;top:0;height:100vh;height:100svh;display:grid;grid-template-rows:auto 1fr auto;padding-block:clamp(20px,4vh,44px);overflow:hidden}
+.scene h2{font-size:clamp(1.6rem,5vw,3.2rem);font-weight:800}
+.stage{position:relative;display:grid;place-items:center;min-height:0}
+.phone{position:absolute;left:50%;bottom:clamp(60px,15vh,130px);width:clamp(104px,17vh,150px);aspect-ratio:1/2;margin-left:calc(clamp(104px,17vh,150px)/-2);border:3px solid var(--cream);border-radius:22px;background:var(--navy);color:var(--cream);overflow:hidden;
+  transform:translateY(calc((1 - var(--a))*-30vh)) rotate(calc((1 - var(--a))*-9deg));box-shadow:0 30px 60px #0006}
+.phone .idle,.phone .done{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:6px;text-align:center;padding:10px;font-size:.7rem}
+.phone .idle{opacity:calc(1 - var(--b));font-family:var(--display);font-size:1.3rem}
+.phone .done{opacity:var(--b);background:var(--teal);color:var(--navy);transform:translateY(calc((1 - var(--b))*30%))}
+.phone .done b{font-family:var(--display);font-size:.8rem}
+.phone .done u{text-decoration:none;background:var(--navy);color:var(--cream);border-radius:99px;padding:5px 14px;margin-top:6px;font-weight:700}
+.pad{position:absolute;left:50%;bottom:clamp(8px,3vh,30px);width:clamp(180px,34vh,300px);aspect-ratio:1;margin-left:calc(clamp(180px,34vh,300px)/-2);border-radius:50%;transform:rotateX(66deg);
+  background:repeating-radial-gradient(circle,var(--teal) 0 6px,transparent 6px 16px);border:8px solid var(--teal);box-shadow:0 0 calc(var(--b)*90px) var(--teal)}
+.steps{list-style:none;padding:0;display:grid;gap:6px;counter-reset:s}
+.steps li{counter-increment:s;display:flex;gap:12px;align-items:baseline;opacity:.4;transition:opacity .3s,transform .3s}
+.steps li::before{content:counter(s);font-family:var(--display);font-weight:800;font-size:.8rem;border:1.5px solid currentColor;border-radius:50%;width:1.9em;height:1.9em;display:grid;place-items:center;flex:none}
+.steps li.on{opacity:1;transform:translateX(8px)}
+.scene:not(.live) .steps li{opacity:1}
+
+/* ---------- product chapters ---------- */
+.chapter{padding-block:clamp(70px,13vw,160px)}
+.chapter .wrap{display:grid;gap:clamp(28px,6vw,72px);align-items:center}
+@media (min-width:820px){.chapter .wrap{grid-template-columns:1fr 1fr}.chapter.flip .visual{order:2}}
+.kicker{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.chapter h2{font-size:clamp(2.3rem,7.5vw,5.2rem);font-weight:800;margin:10px 0 18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin-top:22px}
+.chips li{border:1.5px solid currentColor;border-radius:99px;padding:5px 13px;font-size:.85rem;font-weight:500;font-variant-numeric:tabular-nums}
+.visual{position:relative;height:clamp(300px,58vw,460px);display:grid;place-items:center;--p:.5;--s:0}
+.opens{position:absolute;right:4%;bottom:6%;width:150px;background:var(--cream);color:var(--navy);border-radius:16px;padding:12px 14px;font-size:.78rem;line-height:1.35;box-shadow:0 18px 40px #0b103340;
+  transform:translateY(calc((.5 - var(--p))*110px)) rotate(calc((var(--p) - .5)*-14deg))}
+.opens b{display:block;font-family:var(--display);font-size:.72rem;margin-bottom:4px}
+.opens u{display:inline-block;text-decoration:none;background:var(--navy);color:var(--cream);border-radius:99px;padding:3px 11px;margin-top:8px;font-weight:700}
+.tapico{width:38%;aspect-ratio:1}
+.coaster{width:min(74%,300px);aspect-ratio:1;border-radius:50%;background:var(--navy);display:grid;place-items:center;color:var(--teal);
+  box-shadow:inset 0 0 0 10px var(--navy),inset 0 0 0 13px var(--teal),inset 0 0 0 30px var(--navy),inset 0 0 0 32px var(--teal),0 26px 50px #0b103355;
+  transform:translateY(calc((.5 - var(--p))*70px)) rotate(calc(var(--p)*330deg))}
+.coaster.two{position:absolute;width:min(34%,140px);left:2%;top:4%;box-shadow:inset 0 0 0 5px var(--navy),inset 0 0 0 7px var(--teal),0 14px 30px #0b103344;transform:translateY(calc((.5 - var(--p))*-150px)) rotate(calc(var(--p)*-420deg))}
+.hang{display:grid;justify-items:center;transform-origin:50% 0;transform:translateY(calc((.5 - var(--p))*50px)) rotate(calc(var(--s)*17deg))}
+.loop{width:54px;height:54px;border-radius:50%;border:7px solid var(--navy);margin-bottom:-22px}
+.tag{background:var(--navy);color:var(--cream);display:grid;place-items:center;align-content:center;gap:6px;font-family:var(--display);font-weight:800;position:relative;box-shadow:0 24px 44px #0b10334d}
+.tag::before{content:"";position:absolute;top:13px;left:50%;width:18px;height:18px;margin-left:-9px;border-radius:50%;background:var(--bg)}
+.tag.round{width:clamp(170px,44vw,230px);aspect-ratio:1;border-radius:50%;font-size:clamp(1.3rem,5vw,2rem);color:var(--tangerine)}
+.tag.rect{width:clamp(210px,56vw,290px);aspect-ratio:55/40;border-radius:26px;font-size:clamp(1.6rem,6vw,2.5rem);color:var(--lemon)}
+.tag .tapico{width:24%}
+
+/* ---------- print ---------- */
+.print{padding-block:clamp(70px,12vw,150px);--pp:1;--nx:.5;--c:1}
+.print .wrap{display:grid;gap:clamp(30px,6vw,70px);align-items:center}
+@media (min-width:820px){.print .wrap{grid-template-columns:1fr 1fr}}
+.print h2{font-size:clamp(2rem,6.4vw,4.2rem);font-weight:800;margin-bottom:18px}
+.print p + p{margin-top:12px}
+.printer{position:relative;height:300px;display:grid;align-content:end;justify-items:center;border-bottom:6px solid currentColor;padding-bottom:0}
+.build{position:relative;width:min(78%,320px);height:150px}
+.layers{position:absolute;inset:0;border-radius:18px 18px 6px 6px;background:repeating-linear-gradient(to top,var(--tangerine) 0 5px,#e0611f 5px 6px);clip-path:inset(calc((1 - var(--pp))*100%) 0 0 0)}
+.chip{position:absolute;left:50%;top:10px;width:96px;height:7px;margin-left:-48px;border-radius:4px;background:var(--navy);opacity:var(--c);transform:translateY(calc((1 - var(--c))*-90px))}
+.nozzle{position:absolute;left:calc(var(--nx)*100%);bottom:calc(var(--pp)*150px);width:26px;height:44px;margin-left:-13px;background:var(--navy);clip-path:polygon(0 0,100% 0,100% 60%,62% 100%,38% 100%,0 60%)}
+.rail{position:absolute;left:8%;right:8%;top:28px;height:6px;border-radius:3px;background:currentColor;opacity:.25}
+.count{margin-top:16px;font-family:var(--display);font-size:.85rem;font-variant-numeric:tabular-nums;text-align:center}
+
+/* ---------- close ---------- */
+.nots{padding-block:clamp(70px,12vw,140px) 0}
+.nots ul{list-style:none;padding:0;font-family:var(--display);font-weight:800;font-size:clamp(1.9rem,8.4vw,6rem);line-height:1.05;letter-spacing:-.03em}
+.nots li{--p:.5;transform:translateX(calc((.5 - var(--p))*var(--d,1)*16vw))}
+.nots li:nth-child(even){--d:-1;color:transparent;-webkit-text-stroke:1.5px var(--ink)}
+.nots p{margin-top:26px}
+footer{padding-block:clamp(60px,10vw,120px) 40px}
+footer h2{font-size:clamp(1.8rem,5.6vw,3.6rem);font-weight:800;margin-bottom:22px}
+.soon{display:inline-flex;gap:10px;align-items:center;background:var(--teal);color:var(--navy);border-radius:99px;padding:14px 24px;font-family:var(--display);font-weight:600;font-size:.9rem}
+.fine{margin-top:56px;padding-top:18px;border-top:1.5px solid currentColor;display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;font-size:.85rem}
+
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .scene{height:auto}.pin{position:static;height:auto;gap:24px}.stage{min-height:420px}
+  .badge i,#dot::after,.word.hop span{animation:none}
+}
+</style>
+</head>
+<body>
+<canvas id="rings" aria-hidden="true"></canvas>
+<div id="bar" aria-hidden="true"></div>
+
+<header class="hero" data-bg="#0B1033" style="--sbg:var(--navy);--sink:var(--cream)">
+  <div class="wrap">
+    <div class="top"><span>Dordogne, France</span><span class="badge"><i></i>In prototype</span></div>
+    <div class="word hop" id="word" aria-label="Tapote">
+      <span style="--i:0">t</span><span style="--i:1">a</span><span style="--i:2">p</span><span style="--i:3">o</span><span style="--i:4">t</span><span style="--i:5">e</span>
+    </div>
+    <h1>Everyday objects. One light tap.</h1>
+    <p class="lead">Tapote makes small 3D-printed things with a chip inside. Hold a phone close and the right page opens: the WiFi, the owner's number, who to call.</p>
+    <div class="taphint"><span id="dot"></span><span>Try it. Tap anywhere on this page.</span></div>
+  </div>
+</header>
+
+<div class="marquee" aria-hidden="true">
+  <div class="track" data-dir="-1"><b>tap</b><b>touchez</b><b>tik</b><b>toca</b><b>tippen</b><b>tapote</b><b>tap</b><b>touchez</b><b>tik</b><b>toca</b><b>tippen</b><b>tapote</b></div><br>
+  <div class="track" data-dir="1"><b>wifi</b><b>woof</b><b>who to call</b><b>welcome</b><b>wifi</b><b>woof</b><b>who to call</b><b>welcome</b></div>
+</div>
+
+<section class="scene" id="scene" data-bg="#2B2BD9" style="--sbg:var(--blue);--sink:var(--cream)">
+  <div class="pin wrap">
+    <h2>How one tap works</h2>
+    <div class="stage" aria-hidden="true">
+      <div class="pad" id="pad"></div>
+      <div class="phone">
+        <div class="idle">9:41</div>
+        <div class="done"><b>Gîte du Moulin</b><span>Guest WiFi</span><u>Join</u></div>
+      </div>
+    </div>
+    <ol class="steps" id="steps">
+      <li>Bring a phone close to the object.</li>
+      <li>The chip wakes up and hands over one link.</li>
+      <li>The page opens. No app, no battery, no account.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="chapter" data-bg="#1FE5C5" style="--sbg:var(--teal);--sink:var(--navy)">
+  <div class="wrap">
+    <div class="visual" data-p aria-hidden="true">
+      <div class="coaster two"></div>
+      <div class="coaster"><svg class="tapico" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"><path d="M16 15a13 13 0 0 1 0 18M24 9a22 22 0 0 1 0 30M32 4a30 30 0 0 1 0 40"/></svg></div>
+      <div class="opens"><b>Gîte du Moulin</b>Guest WiFi, house guide, checkout time.<br><u>Join</u></div>
+    </div>
+    <div>
+      <p class="kicker">01 · For hosts</p>
+      <h2>The WiFi coaster</h2>
+      <p>Guests put their glass down and get online. Android phones join with one tap. iPhones scan the code on the back. Either way, nobody spells out a password.</p>
+      <ul class="chips"><li>95 mm across</li><li>PETG</li><li>Sets of 2 or 4</li><li>QR code on the back</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="chapter flip" data-bg="#FF7A3D" style="--sbg:var(--tangerine);--sink:var(--navy)">
+  <div class="wrap">
+    <div class="visual" data-p aria-hidden="true">
+      <div class="hang"><div class="loop"></div><div class="tag round">LOLA<svg class="tapico" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M16 15a13 13 0 0 1 0 18M24 9a22 22 0 0 1 0 30M32 4a30 30 0 0 1 0 40"/></svg></div></div>
+      <div class="opens"><b>Hi, I'm Lola</b>If I'm on my own, I'm lost. My human would love a call.<br><u>Call</u></div>
+    </div>
+    <div>
+      <p class="kicker">02 · For pets</p>
+      <h2>The pet tag</h2>
+      <p>Whoever finds your dog taps the tag and sees how to reach you. You decide what the page shows, and you can change it when you move or switch numbers.</p>
+      <ul class="chips"><li>35 mm</li><li>4 mm thin</li><li>QR backup</li><li>No GPS inside</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" data-bg="#FFD84A" style="--sbg:var(--lemon);--sink:var(--navy)">
+  <div class="wrap">
+    <div class="visual" data-p data-phase="1.6" aria-hidden="true">
+      <div class="hang"><div class="loop"></div><div class="tag rect">SAM<svg class="tapico" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"><path d="M16 15a13 13 0 0 1 0 18M24 9a22 22 0 0 1 0 30M32 4a30 30 0 0 1 0 40"/></svg></div></div>
+      <div class="opens"><b>This bag is Sam's</b>Found it, or need a grown-up? Here's who to call.<br><u>Call</u></div>
+    </div>
+    <div>
+      <p class="kicker">03 · For families</p>
+      <h2>The backpack tag</h2>
+      <p>A first name on the front. On tap, the number to call. Nothing private is printed on the outside, and the page behind it stays in the parent's hands.</p>
+      <ul class="chips"><li>55 × 40 × 5 mm</li><li>Reinforced loop</li><li>QR backup</li><li>You control the page</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="print" id="print" data-bg="#F6F1E7" style="--sbg:var(--cream);--sink:var(--navy)">
+  <div class="wrap">
+    <div>
+      <div class="printer" aria-hidden="true">
+        <div class="rail"></div>
+        <div class="build"><div class="layers"></div><div class="chip"></div><div class="nozzle"></div></div>
+      </div>
+      <p class="count" id="count">Layer 25 of 25 · chip seated</p>
+    </div>
+    <div>
+      <p class="kicker">Made here</p>
+      <h2>Printed 0.2 mm at a time</h2>
+      <p>A backpack tag is 5 mm thick. That is 25 layers of PETG, laid down one by one in our workshop in the Dordogne. Then the chip goes into its pocket and the tag is sealed.</p>
+      <p>The chip is an NTAG213 with 144 bytes of memory, enough for one short link. It has no battery. The phone powers it for the half second it needs.</p>
+    </div>
+  </div>
+</section>
+
+<section class="nots" data-bg="#0B1033" style="--sbg:var(--navy);--sink:var(--cream)">
+  <div class="wrap">
+    <ul>
+      <li data-p>No app.</li>
+      <li data-p>No battery.</li>
+      <li data-p>No subscription.</li>
+      <li data-p>No GPS.</li>
+    </ul>
+    <p>A Tapote object does one thing. Someone has to hold a phone to it, and then it opens a page. It can't track anything, and we won't claim it can.</p>
+  </div>
+  <footer class="wrap">
+    <h2>The first batch is on the printer.</h2>
+    <span class="soon">Etsy shop opening soon</span>
+    <div class="fine"><span>Tapote · smart everyday objects</span><span>Designed and printed in the Dordogne, France</span></div>
+  </footer>
+</section>
+
+<script>
+(function(){
+  var root=document.documentElement, rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var clamp=function(v){return v<0?0:v>1?1:v};
+  var hex=function(h){h=h.replace('#','');return [0,2,4].map(function(i){return parseInt(h.substr(i,2),16)})};
+  var NAVY=hex('#0B1033'), CREAM=hex('#F6F1E7'), ink=CREAM;
+  var secs=[].slice.call(document.querySelectorAll('[data-bg]')).map(function(el){return {el:el,c:hex(el.dataset.bg)}});
+  var movers=[].slice.call(document.querySelectorAll('[data-p]'));
+  var scene=document.getElementById('scene'), steps=[].slice.call(document.querySelectorAll('#steps li'));
+  var print=document.getElementById('print'), count=document.getElementById('count');
+  var word=document.getElementById('word'), dot=document.getElementById('dot'), pad=document.getElementById('pad');
+  var tracks=[].slice.call(document.querySelectorAll('.track')).map(function(el){return {el:el,x:0,dir:+el.dataset.dir}});
+
+  /* rings on every tap */
+  var cv=document.getElementById('rings'), cx=cv.getContext('2d'), rings=[], dpr=1;
+  function size(){dpr=Math.min(2,window.devicePixelRatio||1);cv.width=innerWidth*dpr;cv.height=innerHeight*dpr}
+  size();addEventListener('resize',size);
+  function ring(x,y,n){var t=performance.now();for(var i=0;i<(rm?1:n||3);i++)rings.push({x:x,y:y,t:t+i*130})}
+  function centre(el){var r=el.getBoundingClientRect();return r.bottom<0||r.top>innerHeight?null:[r.left+r.width/2,r.top+r.height/2]}
+  addEventListener('pointerdown',function(e){
+    ring(e.clientX,e.clientY,3);
+    if(!rm){word.classList.remove('hop');void word.offsetWidth;word.classList.add('hop')}
+  });
+  if(!rm)setInterval(function(){var c=centre(dot);if(c&&!document.hidden)ring(c[0],c[1],2)},1400);
+
+  if(rm){return drawOnly()}
+  root.classList.add('morph');scene.classList.add('live');
+  var lastY=scrollY, vel=0, lastT=performance.now(), touched=false;
+
+  function frame(now){
+    var vh=innerHeight, y=scrollY, dt=Math.min(50,now-lastT);lastT=now;
+    vel+=((y-lastY)-vel)*.15;lastY=y;
+    root.style.setProperty('--scroll',clamp(y/(document.documentElement.scrollHeight-vh)));
+
+    /* page colour: blend from chapter to chapter around the middle of the screen */
+    var c=secs[0].c;
+    for(var i=1;i<secs.length;i++){
+      var t=clamp((vh*.75-secs[i].el.getBoundingClientRect().top)/(vh*.5));
+      if(t<=0)break;
+      c=[0,1,2].map(function(k){return Math.round(c[k]+(secs[i].c[k]-c[k])*t)});
+    }
+    var lin=c.map(function(v){v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)});
+    var lum=.2126*lin[0]+.7152*lin[1]+.0722*lin[2];
+    ink=lum>.18?NAVY:CREAM;
+    root.style.setProperty('--bg','rgb('+c+')');root.style.setProperty('--ink','rgb('+ink+')');
+
+    /* objects that turn, swing and slide with the scroll */
+    movers.forEach(function(el){
+      var r=el.getBoundingClientRect();if(r.bottom<-200||r.top>vh+200)return;
+      var p=clamp((vh-r.top)/(vh+r.height));
+      el.style.setProperty('--p',p.toFixed(4));
+      el.style.setProperty('--s',(Math.sin(p*13+(+el.dataset.phase||0))*(1-p*.4)+vel*.02).toFixed(4));
+    });
+
+    /* pinned scene */
+    var sr=scene.getBoundingClientRect(), sp=clamp(-sr.top/(sr.height-vh));
+    var a=clamp(sp/.5), b=clamp((sp-.5)/.18);
+    scene.style.setProperty('--a',(1-Math.pow(1-a,3)).toFixed(4));scene.style.setProperty('--b',b.toFixed(4));
+    var on=sp<.42?0:sp<.72?1:2;steps.forEach(function(li,i){li.classList.toggle('on',i===on)});
+    if(sp>=.5&&!touched){touched=true;var pc=centre(pad);if(pc)ring(pc[0],pc[1],4)}
+    if(sp<.4)touched=false;
+
+    /* printer */
+    var pr=print.getBoundingClientRect(), pp=clamp((vh*.85-pr.top)/(vh*.75));
+    var layer=Math.min(25,Math.floor(pp*25*1.12)), build=Math.min(1,pp*1.12), f=(pp*25*1.12)%2;
+    print.style.setProperty('--pp',build.toFixed(4));
+    print.style.setProperty('--nx',(build>=1?.5:(f>1?2-f:f)).toFixed(3));
+    print.style.setProperty('--c',clamp((pp-.9)/.1).toFixed(3));
+    count.textContent=layer<25?'Layer '+layer+' of 25':(pp>=.99?'Layer 25 of 25 · chip seated':'Layer 25 of 25 · seating the chip');
+
+    /* marquee: drifts on its own, speeds up with the scroll */
+    tracks.forEach(function(m){
+      var half=m.el.scrollWidth/2;
+      m.x+=m.dir*(.045*dt+Math.abs(vel)*.5)*(vel<0?-1:1);
+      if(m.x<-half)m.x+=half;if(m.x>0)m.x-=half;
+      m.el.style.transform='translate3d('+m.x.toFixed(1)+'px,0,0)';
+    });
+
+    draw(now);requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  function draw(now){
+    cx.setTransform(dpr,0,0,dpr,0,0);cx.clearRect(0,0,innerWidth,innerHeight);
+    for(var i=rings.length-1;i>=0;i--){
+      var r=rings[i], age=(now-r.t)/1300;
+      if(age<0)continue;if(age>1){rings.splice(i,1);continue}
+      var e=1-Math.pow(1-age,3);
+      cx.beginPath();cx.arc(r.x,r.y,12+e*Math.max(180,innerWidth*.28),0,6.2832);
+      cx.strokeStyle='rgba('+ink+','+(1-age).toFixed(3)+')';cx.lineWidth=3*(1-age)+.6;cx.stroke();
+    }
+  }
+  function drawOnly(){(function loop(now){draw(now);requestAnimationFrame(loop)})(performance.now())}
+})();
+</script>
+</body>
+</html>
